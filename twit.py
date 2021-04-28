@@ -1,17 +1,22 @@
 import re
+from nltk import text
 import tweepy
-from tweepy import OAuthHandler
-from textblob import TextBlob  # text analysis tool
-# import atlastk
-# import tkinter
-import sklearn
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-# import PySimpleGUI as pgui
-from tweepy.api import API
+# from tweepy import OAuthHandler
+from textblob import TextBlob  # textblob analysis tool
+# Naive Bayes Analysis Textblob
+from textblob.classifiers import NaiveBayesClassifier
+from sklearn.naive_bayes import MultinomialNB  # Naive Bayes Analysis
 
-from tweepy.models import SearchResults
+# import tkinter
+# import sklearn
+# import numpy as np
+# import matplotlib.pyplot as plt
+# import pandas as pd
+# from tweepy import cursor
+# import PySimpleGUI as pgui
+# from tweepy.api import API
+
+# from tweepy.models import SearchResults
 
 
 # pgui.theme ("Reddit")
@@ -31,106 +36,168 @@ from tweepy.models import SearchResults
 
 # window.close()
 
+# tweets= {"text","date","sent"} #"geo",
+tweets = {
+    "text": [],
+    "sent": [],
+    "like": [],
+    "rtwt": []
+    # "date":[]
+}
 
-class tClient(object):  # twitter client class
-    def __init__(self):  # initialisation method
-        # authentication keys from Twitter dev console
+# dict.fromkeys([,])
+# twtext = []
+# twsent = []
+
+# Twitter API keys
 
 
-        # try to authenticate
-        try:
-            # create OAuthHandler object
-            self.auth = OAuthHandler(consumer_key, consumer_secret)
-            # set access token and secret
-            self.auth.set_access_token(access_token, access_token_secret)
-            # create tweepy API object to fetch tweets
-            self.api = tweepy.API(self.auth)
-        except:
-            print("Error: Authentication Failed")
+# Authorising the Tweepy API
+auth = tweepy.auth.OAuthHandler(consumer_key, consumer_secret)
+auth.set_access_token(access_token, access_token_secret)
 
-    def sanitise(self, tweet):
-        return ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t]) |(\w+:\/\/\S+)", " ", tweet).split())
-        # function to sanitise tweets
+api = tweepy.API(auth)  # authorises and enables Tweepy API
 
-    def get_setntiment(self, tweet):  # function for checking tweet polarity
-        tw_sent = TextBlob(self.sanitise(tweet))
-        if tw_sent.sentiment.polarity > 0:
-            return "positive"  # positive tweets
-        elif tw_sent.sentiment.polarity == 0:
-            return "neutral"  # negative tweets
-        else:
-            return "negative"  # tweets with no strong polarity
+# class tClient(object):  # twitter client class
+#     def __init__(self):  # initialisation method
+#         # authentication keys from Twitter dev console
+#         consumer_key = "slIzNagtEBxReY55qDsI06TZp"
+#         consumer_secret = "seY93Z18dZ1bmpfsdETywIYCbCMR3wb5LMcCXMJ5wmWe8RRLXG"
+#         access_token = "836682698596941824-aAkaISzSqP7FNAtnsY4RaYDmR5Yzm0g"
+#         access_token_secret = "bCVSlKSYj2BLSWvN64sYeL5hiOt8na1eG0qDc0RyroxS3"
 
-    def gather(self, query, count=10):
-        # an emptry list for storing tweets to call back later
-        tweets = []
-
-        try:
-            gt = self.api.search(q=query, count=count)
-            for tweet in gt:
-                pt = {}
-                pt["text"] = tweet.text
-                pt["sentiment"] = self.get_setntiment(tweet.text)
-
-                if tweet.retweet_count > 0:  # accepting tweets that even have 0 retweets
-                    if pt not in tweets:
-                        # checks if a tweet isn't in the list
-                        tweets.append(pt)
-                    else:
-                        tweets.append(pt)
-            return tweets
-        except tweepy.TweepError as e:
-            err = ("Error :" + str(e))
+#         # try to authenticate
+#         try:
+#             # create OAuthHandler object
+#             self.auth = OAuthHandler(consumer_key, consumer_secret)
+#             # set access token and secret
+#             self.auth.set_access_token(access_token, access_token_secret)
+#             # create tweepy API object to fetch tweets
+#             self.api = tweepy.API(self.auth)
+#             #, wait_on_rate_limit=True, wait_on_rate_limit_notify=True
+#         except:
+#             print("Error: Authentication Failed")
 
 
 def main():  # main function that calls in tweets
-    class inputClass(object):
-        def __init__(self, term):
-            self.term = term
+    # # client = tClient()
+    # api=tClient()
 
     term = input("Enter a search term: ")
+    getTweets(term)
+    print(tweets)
+    saveTweets()
+    
 
-    api = tClient()
-    # test term to search for, as it is a polarising topic
-    tweets = api.gather(query=term, count=200)
 
-    posi_tweets = [tweet for tweet in tweets if tweet['sentiment']
-                   == "positive"]  # adds positive tweets
-    nega_tweets = [tweet for tweet in tweets if tweet['sentiment']
-                   == "negative"]  # adds negative tweets
-    neu_tweets = [tweet for tweet in tweets if tweet['sentiment']
-                  == "neutral"]
-                  
-    pos_var = len(posi_tweets)  # counting the number of positive tweets
-    neg_var = len(nega_tweets)  # counting the negative tweets
-    neu_var = len(neu_tweets)  # counting neutral tweets
-    #neu_var = pos_var - neg_var
+def getTweets(term):
+    for t in tweepy.Cursor(api.search, q=term, lang="en").items(20):
+        if t.retweet_count > 0:
+            clean_text = str(cleanTweet(t.text))
 
-    print(pos_var)
-    print(neg_var)
-    print(neu_var)
+            tweets["text"].append(clean_text)
+            tweets["sent"].append(tblobSentiment(clean_text))
+            tweets["like"].append(t.retweeted_status.favorite_count)
+            tweets["rtwt"].append(t.retweeted_status.retweet_count)
+            # tweets["date"].append(t.created_at)
+            # tweets["geo"].append(t.geo)
 
-    print("\nPositive tweets\n")
-    for t in posi_tweets:
-        print(t['text'])
+    return tweets
 
-    print("\nNegative tweets\n")
-    for t in nega_tweets:
-        print(t['text'])
 
-    print("\nNeutral tweets\n")
-    for t in neu_tweets:
-        print(t['text'])
+def tblobSentiment(t):  # function for checking tweet polarity
+    tw_sent = TextBlob(t)
+    if tw_sent.sentiment.polarity > 0:
+        return "positive"  # positive tweets
+    elif tw_sent.sentiment.polarity == 0:
+        return "neutral"  # negative tweets
+    else:
+        return "negative"  # tweets with no strong polarity
 
-    def save():
 
-        with open("tweets.csv", "a", encoding="utf-8") as savetweets:
-            for i in tweets:
-                savetweets.write(str(i["text"]+"\n"))
+def cleanTweet(t):
+    # clean_text=re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t]) |(\w+:\/\/\S+)", " ", t).split()
+    t = re.sub("@[A-Za-z0-9]+", "", t)  # removes Twitter handles/@symbol
+    t = re.sub(r"(?:\@|http?\://|https?\://|www)\S+", "", t)  # removes URLs
+    t = " ".join(t.split())
+    return t
 
-        savetweets.close
 
-    save()
+def saveTweets():
+    # try:
+        with open("tweets5.csv", "a+", encoding="utf-8") as tdata:
+            tdata.seek(0)
+            if tdata.read() == "":
+                tdata.write("Tweet,Sentiment,Likes,Retweets\n")
+            for i in range(0,len(tweets["text"])):
+                tdata.write(str(tweets["text"][i])+","+str(tweets["sent"][i])+","+str(tweets["like"][i])+","+str(tweets["rtwt"][i])+"\n")
+            else :
+                tdata.write(str(tweets["text"][i])+","+str(tweets["sent"][i])+","+str(tweets["like"][i])+","+str(tweets["rtwt"][i])+"\n")
+        tdata.close()
+    # except:
+    #     print("Error with save.")
+
+    # # try:
+    # for t in tweets:
+    #     if t.retweet_count > 0:  # accepting tweets that even have 0 retweets
+    #         if t.text not in twtext:
+    #             # checks if a tweet isn't in the list
+    #             twtext.append(t.text)
+    #             twsent.append(tblobSentiment(t.text))
+
+    #         # return twtext, twsent
+
+    # # except tweepy.TweepError as e:
+    # #     err = ("Error :" + str(e))
+
+    # length = len(twtext)
+    # for i in range(length):
+    #     print(twtext[i], twsent[i])
+
+    # saveTweets()
+
+
+
+
+    # posi_tweets = [tweet for tweet in tweets if tweet['sentiment']
+    #                == "positive"]  # adds positive tweets
+    # nega_tweets = [tweet for tweet in tweets if tweet['sentiment']
+    #                == "negative"]  # adds negative tweets
+    # neu_tweets = [tweet for tweet in tweets if tweet['sentiment']
+    #               == "neutral"]
+
+    # pos_var = len(posi_tweets)  # counting the number of positive tweets
+    # neg_var = len(nega_tweets)  # counting the negative tweets
+    # neu_var = len(neu_tweets)  # counting neutral tweets
+    # #neu_var = pos_var - neg_var
+
+    # print(pos_var)
+    # print(neg_var)
+    # print(neu_var)
+
+    # print("\nPositive tweets\n")
+    # for t in posi_tweets:
+    #     print(t['text'])
+
+    # print("\nNegative tweets\n")
+    # for t in nega_tweets:
+    #     print(t['text'])
+
+    # print("\nNeutral tweets\n")
+    # for t in neu_tweets:
+    #     print(t['text'])
+
+    # for i in tweets:
+    #     print(tweets)
+    # def save():
+    #     lengh =len(tweets)
+    #     with open("tweets2.csv", "a", encoding="utf-8") as savetweets:
+    #         for i in range(lengh):
+    #             savetweets.write(str(tweets["text"]+"\n"))
+
+    #     savetweets.close
+
+    # save()
 
 
 if __name__ == "__main__":
