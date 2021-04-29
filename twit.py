@@ -1,13 +1,12 @@
 import re
-from nltk import text
 import tweepy
-# from tweepy import OAuthHandler
+import mysql.connector
 from textblob import TextBlob  # textblob analysis tool
-# Naive Bayes Analysis Textblob
 from textblob.classifiers import NaiveBayesClassifier
 from sklearn.naive_bayes import MultinomialNB  # Naive Bayes Analysis
 
 # import tkinter
+# from nltk import text
 # import sklearn
 # import numpy as np
 # import matplotlib.pyplot as plt
@@ -15,7 +14,7 @@ from sklearn.naive_bayes import MultinomialNB  # Naive Bayes Analysis
 # from tweepy import cursor
 # import PySimpleGUI as pgui
 # from tweepy.api import API
-
+# from tweepy import OAuthHandler
 # from tweepy.models import SearchResults
 
 
@@ -38,10 +37,12 @@ from sklearn.naive_bayes import MultinomialNB  # Naive Bayes Analysis
 
 # tweets= {"text","date","sent"} #"geo",
 tweets = {
+    "id" : [],
+    "term": [],
     "text": [],
     "sent": [],
-    "like": [],
-    "rtwt": []
+    # "like": [],
+    # "rtwt": []
     # "date":[]
 }
 
@@ -50,13 +51,32 @@ tweets = {
 # twsent = []
 
 # Twitter API keys
-
+consumer_key = ""
+consumer_secret = ""
+access_token = ""
+access_token_secret = ""
 
 # Authorising the Tweepy API
 auth = tweepy.auth.OAuthHandler(consumer_key, consumer_secret)
 auth.set_access_token(access_token, access_token_secret)
 
 api = tweepy.API(auth)  # authorises and enables Tweepy API
+
+
+try:
+    connection = mysql.connector.connect(
+        user="", 
+        password="",
+        host="",
+        database=""
+        )
+
+
+    cursor = connection.cursor()
+except connection.Error as err:
+    print(err)
+
+
 
 # class tClient(object):  # twitter client class
 #     def __init__(self):  # initialisation method
@@ -86,19 +106,41 @@ def main():  # main function that calls in tweets
     term = input("Enter a search term: ")
     getTweets(term)
     print(tweets)
-    saveTweets()
-    
+    addtoTable()
+    # saveTweets()
 
+class tweepStreamListener(tweepy.StreamListener):
+
+    def on_status(self, status):
+        print(status.text)
+
+def addtoTable ():
+            for i in range(0, len(tweets["text"])):
+                x = connection.cursor()
+                x.execute("INSERT INTO tweets (search,text,sentiment) VALUES (%s,%s,%s)", (str(tweets["term"][i]),str(tweets["text"][i]),str(tweets["sent"][i])) )
+
+                # print("1 record inserted, ID:", cursor.lastrowid)
+
+                # add_search = ()
+                # add_tweet = ()
+                # add_sentiment = ()
+
+                connection.commit()
+
+
+def getStream():
+    pass
 
 def getTweets(term):
-    for t in tweepy.Cursor(api.search, q=term, lang="en").items(20):
-        if t.retweet_count > 0:
+    for t in tweepy.Cursor(api.search, q=term, lang="en").items(1000):
+        if t.id not in tweets["id"]:
             clean_text = str(cleanTweet(t.text))
-
+            tweets["id"].append(t.id)
+            tweets["term"].append(term)
             tweets["text"].append(clean_text)
             tweets["sent"].append(tblobSentiment(clean_text))
-            tweets["like"].append(t.retweeted_status.favorite_count)
-            tweets["rtwt"].append(t.retweeted_status.retweet_count)
+            # tweets["like"].append(t.retweeted_status.favorite_count)
+            # tweets["rtwt"].append(t.retweeted_status.retweet_count)
             # tweets["date"].append(t.created_at)
             # tweets["geo"].append(t.geo)
 
@@ -125,15 +167,20 @@ def cleanTweet(t):
 
 def saveTweets():
     # try:
-        with open("tweets5.csv", "a+", encoding="utf-8") as tdata:
-            tdata.seek(0)
-            if tdata.read() == "":
-                tdata.write("Tweet,Sentiment,Likes,Retweets\n")
-            for i in range(0,len(tweets["text"])):
-                tdata.write(str(tweets["text"][i])+","+str(tweets["sent"][i])+","+str(tweets["like"][i])+","+str(tweets["rtwt"][i])+"\n")
-            else :
-                tdata.write(str(tweets["text"][i])+","+str(tweets["sent"][i])+","+str(tweets["like"][i])+","+str(tweets["rtwt"][i])+"\n")
-        tdata.close()
+    with open("tweets5.csv", "a+", encoding="utf-8") as tdata:
+        tdata.seek(0)
+        if tdata.read() == "":
+            tdata.write("Tweet,Sentiment,Likes,Retweets\n")
+        for i in range(0, len(tweets["text"])):
+            tdata.write(str(tweets["term"][i]) + "," + str(tweets["text"]
+                        [i]).replace(",", " ")+","+str(tweets["sent"][i])+"\n")
+
+    # tdata.write(str(tweets["term"][i])+ "," + str(tweets["text"][i]).replace(","," ")+","+str(tweets["sent"][i])+","
+    # +str(tweets["like"][i])+","+str(tweets["rtwt"][i])+"\n")
+        else:
+            tdata.write(str(tweets["term"][i]) + "," + str(tweets["text"]
+                        [i]).replace(",", " ")+","+str(tweets["sent"][i])+"\n")
+    tdata.close()
     # except:
     #     print("Error with save.")
 
@@ -155,9 +202,6 @@ def saveTweets():
     #     print(twtext[i], twsent[i])
 
     # saveTweets()
-
-
-
 
     # posi_tweets = [tweet for tweet in tweets if tweet['sentiment']
     #                == "positive"]  # adds positive tweets
@@ -198,7 +242,5 @@ def saveTweets():
     #     savetweets.close
 
     # save()
-
-
 if __name__ == "__main__":
     main()
